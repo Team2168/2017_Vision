@@ -53,6 +53,7 @@ struct ProgParams
 	bool USB_Cam;
 	bool FPS;
 	bool Log;
+	bool USE_DROID;
 };
 
 //Stuct to hold information about targets found
@@ -940,6 +941,7 @@ void initializeParams(ProgParams& params)
 	params.USB_Cam = false;
 	params.FPS = false;
 	params.Log = false;
+	params.USE_DROID = false;
 
 }
 
@@ -972,6 +974,7 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
 				// We know the next argument *should* be the filename:
 				params.IMAGE_FILE = string(argv[i + 1]);
 				params.From_Camera = false;
+				params.USE_DROID = false;
 				params.From_File = true;
 				i++;
 			}
@@ -997,15 +1000,27 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
 				params.CAMERA_IP = string(argv[i + 1]);
 				params.From_Camera = true;
 				params.From_File = false;
+				params.USE_DROID = false;
 				params.USB_Cam = false;
 				i++;
 			}
+			else if ((string(argv[i]) == "-droid") && (i + 1 < argc)) //camera IP
+			{
+				params.CAMERA_IP = string(argv[i + 1]);
+				params.From_Camera = true;
+				params.From_File = false;
+				params.USE_DROID = true;
+				params.USB_Cam = false;
+				i++;
+			}
+
 			else if (string(argv[i]) == "-u") //use USB Camera
 			{
 				//params.CAMERA_IP = string(argv[i + 1]);
 				params.From_Camera = true;
 				params.From_File = false;
 				params.USB_Cam = true;
+				params.USE_DROID = false;
 			}
 			else if ((string(argv[i]) == "-s") && (i + 1 < argc)) //robot TCP SERVER IP
 			{
@@ -1379,8 +1394,12 @@ void *VideoCap(void *args)
 		}
 		else //connect to IP Cam
 		{
-			//std::string videoStreamAddress = "http://" + struct_ptr->CAMERA_IP +"/mjpg/video.mjpg";
-			std::string videoStreamAddress = "http://10.21.68.169:4747/mjpegfeed/?dummy=param.mjpg";
+			std::string videoStreamAddress;
+			if(struct_ptr->USE_DROID)
+				videoStreamAddress = "http://" + struct_ptr->CAMERA_IP +"/mjpegfeed/?dummy=param.mjpg";
+			else
+				videoStreamAddress = "http://" + struct_ptr->CAMERA_IP +"/mjpg/video.mjpg";
+
 			std::cout<<"Trying to connect to Camera stream... at: "<<videoStreamAddress<<std::endl;
 
 			int count = 1;
