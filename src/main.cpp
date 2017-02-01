@@ -54,6 +54,7 @@ struct ProgParams
 	bool FPS;
 	bool Log;
 	bool USE_DROID;
+	bool Threshold;
 };
 
 //Stuct to hold information about targets found
@@ -99,6 +100,7 @@ void NullTargets(Target& target);
 void CalculateDist(Target& targets);
 void CalculateBearing(Target& targets);
 double CalculateHorizontalAngle(double targetYPix, double targetHeightPix);
+void onMouse( int event, int x, int y, int, void* );
 
 //Threaded TCP Functions
 void *TCP_thread(void *args);
@@ -149,6 +151,11 @@ const Scalar RED = Scalar(0, 0, 255),
 			PINK = Scalar(255, 0,255),
 			OFF_COLOR = Scalar(200, 100, 50),
 			WHITE = Scalar(255, 255, 255);
+
+static int mouse_h = -1;
+static int mouse_s = -1;
+static int mouse_v = -1;
+
 
 //GLOBAL MUTEX LOCK VARIABLES
 pthread_mutex_t targetMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -268,11 +275,8 @@ int main(int argc, const char* argv[])
 		if (params.Process && progRun)
 		{
 
-			std::cout<<"Process Thread Started"<<endl;
-
 			//Lock Targets and determine goals
 			pthread_mutex_lock(&targetMutex);
-			std::cout<<"Process Thread Started after lock1"<<endl;
 
 			targets.isProcessThreadRunning = true;
 			pthread_mutex_unlock(&targetMutex);
@@ -295,6 +299,34 @@ int main(int argc, const char* argv[])
 				frame.copyTo(img);
 				pthread_mutex_unlock(&frameMutex);
 
+
+				if(params.Threshold)
+				{
+					string window = "thresh";
+
+					if(mouse_h != -1)
+					{
+						ostringstream output;
+						output << "H_Val: " << mouse_h <<"    S_Val: "<<mouse_s<<"    V_val: "<<mouse_v;
+						putText(img, output.str(), Point(100 + 10, 100 + 60), FONT_HERSHEY_PLAIN, 1, WHITE, 1, 1);
+					}
+
+					imshow(window, img);
+					//set the callback function for any mouse event
+					setMouseCallback(window, onMouse, &img);
+
+					createTrackbar( "Hue_Min",window, &minH, 180, NULL );
+					createTrackbar( "Hue_Max",window, &maxH, 180, NULL );
+					createTrackbar( "Saturation_Min",window, &minS, 255,NULL );
+					createTrackbar( "Saturation_Max",window, &maxS, 255,NULL );
+					createTrackbar( "Value_Min",window, &minV, 255,NULL);
+					createTrackbar( "Value_Max",window, &maxV, 255,NULL);
+				}
+
+
+
+
+
 				thresholded = ThresholdImage(img);
 
 				//Lock Targets and determine goals
@@ -316,6 +348,8 @@ int main(int argc, const char* argv[])
 
 				if(params.FPS)
 					cout << "Processing at "  << 1/diffClock(start,end) << " FPS \n";
+
+
 
 
 			}
@@ -440,6 +474,8 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 		imwrite(fileSave,original);
 		cout<<"writing_to_file: "<<fileSave<<endl<<endl;
 	}
+
+
 	vector<Vec4i> hierarchy;
 	vector<vector<Point> > contours;
 
@@ -855,6 +891,11 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 		//imshow("Contours", original); //Make a rectangle that encompasses the target
 	}
 
+
+	  if(params.Threshold)
+		  imshow("Output", original);
+
+
 //	pthread_mutex_lock(&matchStartMutex);
 //	if (!targets.matchStart)
 //		{
@@ -942,6 +983,7 @@ void initializeParams(ProgParams& params)
 	params.FPS = false;
 	params.Log = false;
 	params.USE_DROID = false;
+	params.Threshold = false;
 
 }
 
@@ -1060,6 +1102,10 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
 			else if (string(argv[i]) == "-FPS") //Enable FPS output
 			{
 				params.FPS = true;
+			}
+			else if (string(argv[i]) == "-threshold") //Enable FPS output
+			{
+				params.Threshold = true;
 			}
 			else if (string(argv[i]) == "-d") //Default Params
 			{
@@ -1332,9 +1378,6 @@ void *VideoCap(void *args)
 		cout<<"File Loaded: Starting Processing Thread"<<endl;
 		progRun = true;
 
-		imshow("frame", frame); //Make a rectangle that encompasses the target
-
-
 	}
 
 	else if(struct_ptr->From_Camera)
@@ -1603,5 +1646,26 @@ void rot90(cv::Mat &matImage, int rotflag)
   } else if (rotflag != 0){ //if not 0,1,2,3:
     cout  << "Unknown rotation flag(" << rotflag << ")" << endl;
   }
+}
+
+void onMouse( int event, int x, int y, int, void* param)
+{
+    if( event != CV_EVENT_LBUTTONDOWN )
+            return;
+    Mat hsv;
+    Mat* rgb = (Mat*) param;
+    cvtColor(*rgb,hsv,COLOR_BGR2HSV);
+
+//            printf("%d %d: %d, %d, %d\n",
+//            x, y,
+//            (int)hsv.at<Vec3b>(y, x)[0],
+//            (int)hsv.at<Vec3b>(y, x)[1],
+//            (int)hsv.at<Vec3b>(y, x)[2]);
+
+            mouse_h = (int)hsv.at<Vec3b>(y, x)[0];
+			mouse_s = (int)hsv.at<Vec3b>(y, x)[1];
+			mouse_v = (int)hsv.at<Vec3b>(y, x)[2];
+
+
 }
 
