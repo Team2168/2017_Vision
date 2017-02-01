@@ -4,8 +4,8 @@
 #define VIEW_ANGLE 34.8665269
 #define AUTO_STEADY_STATE 1.9
 
-#define TARGET_WIDTH_IN 20.125
-#define TARGET_HEIGHT_IN 14
+#define TARGET_WIDTH_IN 15
+#define TARGET_HEIGHT_IN 4
 #define FOV_WIDTH_PIX 640
 #define FOV_HEIGHT_PIX 480
 #define CAMERA_WIDTH_FOV_ANGLE_RAD 0.743879868
@@ -538,8 +538,8 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 
 	//Confirm we only have 2 contours left by area
-	//if (contours.size() > 2)
-	//{
+	if (contours.size() > 2)
+	{
 		vector<RotatedRect> minRectTest(contours.size());
 		double largestArea = 200;
 		for (vector<vector<Point> >::iterator it = contours.begin();
@@ -565,7 +565,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 		}
 
 
-	//}
+	}
 
 
 	//Rotate image
@@ -930,7 +930,7 @@ Mat ThresholdImage(Mat original)
 
 
 	//smooth edges
-	blur(thresholded, thresholded, Size(3, 3));
+	//blur(thresholded, thresholded, Size(3, 3));
 
 	//Additional filtering if needed
 	//Canny(thresholded, thresholded, 100, 100, 3);
