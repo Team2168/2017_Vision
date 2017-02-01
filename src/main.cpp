@@ -160,6 +160,12 @@ pthread_cond_t newFrameToStreamSignal = PTHREAD_COND_INITIALIZER;
 pthread_cond_t FrameCopyCompleteSignal = PTHREAD_COND_INITIALIZER;
 pthread_cond_t targetUpdateCompleteSignal = PTHREAD_COND_INITIALIZER;
 
+
+bool isNewFrameToStream = false;
+bool isFrameCopyComplete = false;
+bool isTargetUpdateComplete = false;
+
+
 //Thread Variables
 pthread_t TCPthread;
 pthread_t TCPsend;
@@ -257,7 +263,6 @@ int main(int argc, const char* argv[])
 		//check if program is allowed to run
 		//this bool, is enabled by the mjpeg thread
 		//once it is up to 10fps
-cout<<"process thread: "<<params.Process<<" Progrun: "<<progRun<<endl;
 
 		if (params.Process && progRun)
 		{
@@ -267,25 +272,25 @@ cout<<"process thread: "<<params.Process<<" Progrun: "<<progRun<<endl;
 			//Lock Targets and determine goals
 			pthread_mutex_lock(&targetMutex);
 			std::cout<<"Process Thread Started after lock1"<<endl;
-			//pthread_cond_wait(&targetUpdateCompleteSignal,&targetMutex);
+
 			targets.isProcessThreadRunning = true;
-			std::cout<<"Process Thread Started after lock2"<<endl;
 			pthread_mutex_unlock(&targetMutex);
-			std::cout<<"Process Thread Started after lock3"<<endl;
-			pthread_cond_broadcast(&targetUpdateCompleteSignal);
-			std::cout<<"Process Thread Started after lock4"<<endl;
+
 
 			//start clock to determine our processing time;
 			clock_gettime(CLOCK_REALTIME, &start);
-
 			pthread_mutex_lock(&frameMutex);
-			std::cout<<"Process Thread Started after lock 5"<<endl;
-			//pthread_cond_wait(&FrameCopyCompleteSignal, &frameMutex);
-			std::cout<<"Process Thread Started after lock6"<<endl;
+
+			//Only run processing thread on new frames, if a new frame
+			//isn't available this thread will sleep, until the frame
+			//grabber thread signals the condition to wake this thread
+			//up
+			while(!isFrameCopyComplete)
+				pthread_cond_wait(&FrameCopyCompleteSignal, &frameMutex);
+
 
 			if (!frame.empty())
 			{
-				std::cout<<"Process Thread Started after lock7"<<endl;
 				frame.copyTo(img);
 				pthread_mutex_unlock(&frameMutex);
 
@@ -293,7 +298,6 @@ cout<<"process thread: "<<params.Process<<" Progrun: "<<progRun<<endl;
 
 				//Lock Targets and determine goals
 				pthread_mutex_lock(&targetMutex);
-				//pthread_cond_wait(&targetUpdateCompleteSignal,&targetMutex);
 				findTarget(img, thresholded, targets, params);
 
 				if(params.Debug)
@@ -303,8 +307,6 @@ cout<<"process thread: "<<params.Process<<" Progrun: "<<progRun<<endl;
 					cout<<"\tRotation: " <<targets.TargetBearing<<endl;
 				}
 				pthread_mutex_unlock(&targetMutex);
-				pthread_cond_broadcast(&targetUpdateCompleteSignal);
-
 
 				clock_gettime(CLOCK_REALTIME, &end);
 
@@ -848,7 +850,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 		pthread_mutex_lock(&mjpegServerFrameMutex);
 		original.copyTo(imgToStream);
 		pthread_mutex_unlock(&mjpegServerFrameMutex);
-		pthread_cond_signal(&newFrameToStreamSignal);
+		pthread_cond_broadcast(&newFrameToStreamSignal);
 		//imshow("Contours", original); //Make a rectangle that encompasses the target
 	}
 
@@ -1172,14 +1174,8 @@ void *TCP_Send_Thread(void *args)
 		//MatchStart, HotGoal, Distance, message #
 
 		pthread_mutex_lock(&targetMutex);
-		//pthread_cond_wait(&targetUpdateCompleteSignal,&targetMutex);
 		stringstream message;
 
-		//create string stream message;
-		//message << "1," << targets.TargetBearing << "," <<
-		//		targets.targetDistance << endl;
-
-		//[isMatchStarted,numberOfContours,distanceToContour,angleToContour,isTargetScoreable,isProcessThreadRunning,isCameraConnected,isMjpegClientConnected]
 		message << targets.matchStart << "," <<
 				targets.TargetBearing << "," <<
 				targets.targetDistance << "," <<
@@ -1312,7 +1308,9 @@ void *VideoCap(void *args)
 
 		//read img and store it in global variable
 		pthread_mutex_lock(&frameMutex);
+		isFrameCopyComplete=false;
 		frame = imread(struct_ptr->IMAGE_FILE);
+		isFrameCopyComplete=true;
 		pthread_mutex_unlock(&frameMutex);
 		pthread_cond_signal(&FrameCopyCompleteSignal);
 
@@ -1381,8 +1379,8 @@ void *VideoCap(void *args)
 		}
 		else //connect to IP Cam
 		{
-			std::string videoStreamAddress = "http://" + struct_ptr->CAMERA_IP +"/mjpg/video.mjpg";
-
+			//std::string videoStreamAddress = "http://" + struct_ptr->CAMERA_IP +"/mjpg/video.mjpg";
+			std::string videoStreamAddress = "http://10.21.68.169:4747/mjpegfeed/?dummy=param.mjpg";
 			std::cout<<"Trying to connect to Camera stream... at: "<<videoStreamAddress<<std::endl;
 
 			int count = 1;
@@ -1408,7 +1406,6 @@ void *VideoCap(void *args)
 		pthread_mutex_lock(&targetMutex);
 		targets.cameraConnected = true;
 		pthread_mutex_unlock(&targetMutex);
-		pthread_cond_broadcast(&targetUpdateCompleteSignal);
 
 		//end clock to determine time to setup stream
 		clock_gettime(CLOCK_REALTIME, &end);
@@ -1430,7 +1427,9 @@ void *VideoCap(void *args)
 
 			//read frame and store it in global variable
 			pthread_mutex_lock(&frameMutex);
+			isFrameCopyComplete=false;
 			vcap.read(frame);
+			isFrameCopyComplete=true;
 			pthread_mutex_unlock(&frameMutex);
 			pthread_cond_signal(&FrameCopyCompleteSignal);
 
@@ -1465,60 +1464,12 @@ void *VideoCap(void *args)
 	return NULL;
 }
 
-//void *HotGoalCounter(void *args)
-//{
-//
-//	//If this method started, then the match started
-//
-//
-//	while (true)
-//	{
-//		clock_gettime(CLOCK_REALTIME, &autoEnd);
-//		double timeNow = diffClock(autoStart,autoEnd);
-//		if(timeNow<5)
-//		{
-//			pthread_mutex_lock(&targetMutex);
-//			if(targets.targetLeftOrRight == 0)
-//				targets.hotLeftOrRight = targets.lastTargerLorR * -1;
-//			else
-//				targets.hotLeftOrRight = targets.targetLeftOrRight;
-//			pthread_mutex_unlock(&targetMutex);
-//
-//			cout<<"this side hot"<<endl;
-//		}
-//		else if(timeNow<10)
-//		{
-//			//Auto has been running for 5 seconds, so the other side is hot
-//			//we update the variable to switch to other side
-//			pthread_mutex_lock(&targetMutex);
-//			targets.hotLeftOrRight = targets.hotLeftOrRight * -1;
-//			pthread_mutex_unlock(&targetMutex);
-//
-//			cout<<"otherside hot"<<endl;
-//		}
-//		else if (timeNow >= 10)
-//		{
-//			//Auto is over, no more hot targets, end thread
-//			pthread_mutex_lock(&targetMutex);
-//			targets.hotLeftOrRight = 0;
-//			pthread_mutex_unlock(&targetMutex);
-//			cout<<"auto over"<<endl;
-//			break;
-//		}
-//
-//		usleep(50000); // run 10 times a second
-//
-//	}
-//
-//	return NULL;
-//
-//}
 
 void printCommandLineUsage()
 {
 	cout<<"Usage: 2168_Vision  [Input]  [Options] \n\n";
 
-	cout<<setw(10)<<left<<"Inputs:  Choose Only 1"<<endl;
+	cout<<setw(10)<<left<<"Inputs:  Choose Only 1 (-f or -c or -u)"<<endl;
 
 	cout<<setw(10)<<left<<"";
 	cout<<setw(20)<<left<<"-f <file location>";
@@ -1575,6 +1526,7 @@ void *MJPEG_Server_Thread(void *args)
 	//listen for incoming connection, blocks until a client connections
 	mjpeg_s.host(args);
 	targets.isMjpegClientConnected = true;
+
 	//once connected, we start streaming data
 	pthread_create(&MJPEGHost, NULL, MJPEG_host, args);
 	pthread_detach(MJPEGHost);
@@ -1588,12 +1540,9 @@ void *MJPEG_host(void *args)
 
 	while (true)
 	{
-		//locks on each mpeg frame, and waits until a new frame is needed
-		//this loop doesn't need a sleep, because the signal handler will
-		//put it to sleep and only wake it up when a new frame is ready
-		//this method will only serve a new image, instead of serving a single
-		//image multiple times.
-		pthread_mutex_lock(&mjpegServerFrameMutex);
+		//wait for first valid frame before trying to serve mjpeg image
+		//if we don't wait mjpeg server will try to serve invalid data
+		//and/or throw null pointer.
 		pthread_cond_wait(&newFrameToStreamSignal, &mjpegServerFrameMutex);
 		if (!mjpeg_s.setImageToHost(imgToStream))
 		{
@@ -1603,8 +1552,9 @@ void *MJPEG_host(void *args)
 		}
 		pthread_mutex_unlock(&mjpegServerFrameMutex);
 
-	}
+		usleep(1/60*100000); //run 60 times a second
 
+	}
 
 
 	return NULL;
@@ -1619,7 +1569,7 @@ double BestTarget()
 	return 0;
 }
 
-
+//Rotate image based on camera installation angle
 void rot90(cv::Mat &matImage, int rotflag)
 {
   //1=CW, 2=CCW, 3=180
