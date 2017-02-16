@@ -77,8 +77,6 @@ void ZedInterface::getCurrentDepthImage(cv::Mat& frame)
 double ZedInterface::getDepthAtPoint(int x, int y, int width, int height)
 {
 
-	int windowSize = 40;
-
 	depth = zedcam->retrieveMeasure(sl::zed::MEASURE::DEPTH);
 	depthData = (float*)depth.data;
 	int depthStep = depth.step;
@@ -96,7 +94,7 @@ double ZedInterface::getDepthAtPoint(int x, int y, int width, int height)
 			sum += ptr_image_num[x];
 		}
 
-	return sum/(windowSize*windowSize);
+	return sum/(width*height);
 
 
 
@@ -137,6 +135,16 @@ void ZedInterface::setZEDSaturation(int value)
 void ZedInterface::setZEDGain(int value)
 {
 	zedcam->setCameraSettingsValue(sl::zed::ZEDCamera_settings::ZED_GAIN, value); //-1 to 100
+}
+
+void ZedInterface::setZedCamSetting(int zedBrightness, int zedContrast, int zedExposure, int zedHue, int zedSat, int zedGain)
+{
+		setZEDBrightness(zedBrightness);
+		setZEDContrast(zedContrast);
+		setZEDExposure(zedExposure);
+		setZEDHue(zedHue);
+		setZEDSaturation(zedSat);
+		setZEDGain(zedGain);
 }
 
 

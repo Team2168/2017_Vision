@@ -205,12 +205,12 @@ Mat imgToStream;
 struct timespec autoStart, autoEnd;
 
 ZedInterface cam;
-int brightness = 4; //0 8
-int contrast = 4; //0 8
-int exposure = -1; // -1 8
-int zedhue = 5; //0 11
-int zedsat = 4; //0 8
-int gain = -1; //-1 100
+int zedBrightness = 4; //0 8
+int zedContrast = 4; //0 8
+int zedExposure = -1; // -1 8
+int zedHue = 5; //0 11
+int zedSat = 4; //0 8
+int zedGain = -1; //-1 100
 
 //Control process thread exectution
 bool progRun;
@@ -346,12 +346,12 @@ int main(int argc, const char* argv[])
 
 					string camTune = "came Tune";
 					imshow(camTune, img);
-					createTrackbar("ZED Brightness",camTune, &brightness, 8, NULL );
-					createTrackbar("ZED Contrast",camTune, &contrast, 8, NULL );
-					createTrackbar("ZED Exposure",camTune, &exposure, 100, NULL );
-					createTrackbar("ZED Hue",camTune, &zedhue, 11, NULL );
-					createTrackbar("ZED Saturation",camTune, &zedsat, 8, NULL );
-					createTrackbar("ZED Gain",camTune, &gain, 100, NULL );
+					createTrackbar("ZED Brightness",camTune, &zedBrightness, 8, NULL );
+					createTrackbar("ZED Contrast",camTune, &zedContrast, 8, NULL );
+					createTrackbar("ZED Exposure",camTune, &zedExposure, 100, NULL );
+					createTrackbar("ZED Hue",camTune, &zedHue, 11, NULL );
+					createTrackbar("ZED Saturation",camTune, &zedSat, 8, NULL );
+					createTrackbar("ZED Gain",camTune, &zedGain, 100, NULL );
 
 
 
@@ -1088,6 +1088,18 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
 
 				i += 6;
 			}
+			else if ((string(argv[i]) == "-ZEDParam") && (i + 6 < argc)) {
+				zedBrightness = atoi(argv[i + 1]);
+				zedContrast = atoi(argv[i + 2]);
+
+				zedExposure = atoi(argv[i + 3]);
+				zedHue = atoi(argv[i + 4]);
+
+				zedSat = atoi(argv[i + 5]);
+				zedGain = atoi(argv[i + 6]);
+
+				i += 6;
+			}
 			else if ((string(argv[i]) == "-c") && (i + 1 < argc)) //camera IP
 			{
 				params.CAMERA_IP = string(argv[i + 1]);
@@ -1504,6 +1516,12 @@ void *VideoCap(void *args)
 			//Initialize Zed Camera
 
 			cam.ZED_init_VGA();
+			cam.setZEDBrightness(zedBrightness);
+			cam.setZEDContrast(zedContrast);
+			cam.setZEDExposure(zedExposure);
+			cam.setZEDHue(zedHue);
+			cam.setZEDSaturation(zedSat);
+			cam.setZEDGain(zedGain);
 
 			FOV_WIDTH_PIX = cam.getCameraWidth();
 			FOV_HEIGHT_PIX = cam.getCameraHeight();
@@ -1796,11 +1814,11 @@ void onMouse( int event, int x, int y, int, void* param)
 			cout<< "x: "<<x << ", y: "<<y<<endl;
 			depthAtPoint = cam.getDepthAtPoint(x, y); //(int)hsv.at<Vec3b>(y, x)[3];//
 
-			cam.setZEDBrightness(brightness);
-			cam.setZEDContrast(contrast);
-			cam.setZEDExposure(exposure);
-			cam.setZEDHue(zedhue);
-			cam.setZEDSaturation(zedsat);
-			cam.setZEDGain(gain);
+			cam.setZEDBrightness(zedBrightness);
+			cam.setZEDContrast(zedContrast);
+			cam.setZEDExposure(zedExposure);
+			cam.setZEDHue(zedHue);
+			cam.setZEDSaturation(zedSat);
+			cam.setZEDGain(zedGain);
 }
 
