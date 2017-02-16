@@ -1109,15 +1109,13 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
 				i++;
 			}
 
-			else if ((string(argv[i]) == "-ZED") && (i + 1 < argc)) //camera IP
+			else if (string(argv[i]) == "-ZED") //camera IP
 			{
-				params.CAMERA_IP = string(argv[i + 1]);
 				params.From_Camera = true;
 				params.From_File = false;
 				params.USE_DROID = false;
 				params.USE_ZED = true;
 				params.USB_Cam = false;
-				i++;
 			}
 
 			else if (string(argv[i]) == "-u") //use USB Camera
