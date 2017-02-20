@@ -42,6 +42,7 @@ public:
     void setZEDHue(int value);
     void setZEDSaturation(int value);
     void setZEDGain(int value);
+    void setZedCamSetting(int zedBrightness, int zedContrast, int zedExposure, int zedHue, int zedSat, int zedGain);
 
 };
 
