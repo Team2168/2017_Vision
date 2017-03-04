@@ -161,6 +161,7 @@ double depthAtPoint = -1;
 
 int FOV_WIDTH_PIX = 640;
 int  FOV_HEIGHT_PIX = 480;
+int TARGET_SCORE = 55;
 
 
 //GLOBAL MUTEX LOCK VARIABLES
@@ -622,6 +623,9 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 	if (!contours.empty() && !hierarchy.empty())
 	{
 
+		int xC[contours.size()];
+		int yC[contours.size()];
+
 		for (unsigned int i = 0; i < contours.size(); i++)
 		{
 			//capture corners of contour
@@ -645,6 +649,11 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 			double WHRatio = box.width / ((double) box.height);
 			double HWRatio = ((double) box.height) / box.width;
 
+
+
+			xC[i] = box.x + box.width / 2;
+			yC[i] = box.y + box.height / 2;
+
 			//calculate distance and target to each target
 			//calculate distance and target to each target
 			double dist = 0;
@@ -659,6 +668,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 			line(original, center, center, YELLOW, 3);
 
 
+
 			const int WEIGHT = 25;
 			double angleGrade, WHRatioGrade, distGrade, bearingGrade;
 
@@ -671,10 +681,10 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 				//angleGrade = WEIGHT - (WEIGHT* abs(minRect[i].angle) / 60);
 
 
-			if (WHRatio > 2 || HWRatio > 2)
+			if (WHRatio < 0.2 || WHRatio > 1)
 				WHRatioGrade = 0;
 			else
-				WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-1.4)/1.4);
+				WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
 
 			if (dist > 400 || dist<=0)
 				distGrade = 0;
@@ -738,10 +748,13 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 		}
 
+
 		int i =0;
-		if(contour0Score>contour1Score && contour0Score >= 56)
-			{i = 0;
-			//capture corners of contour
+		if(contour0Score >= TARGET_SCORE)
+			{
+
+						i = 0;
+						//capture corners of contour
 						minRect[i] = minAreaRect(Mat(contours[i]));
 
 						if(params.Visualize)
@@ -783,7 +796,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 						else
 							targets.isTargetScoreable = false;
 			}
-		else if (contour1Score>contour0Score && contour1Score >= 56)
+		if (contour1Score >= TARGET_SCORE)
 		{
 				i=1;
 
@@ -831,6 +844,58 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 							else
 								targets.isTargetScoreable = false;
 		}
+
+
+		//additional scoring
+		if(contour1Score >= TARGET_SCORE && contour0Score >= TARGET_SCORE)
+		{
+			const int WEIGHT = 25;
+			double WHRatioComparisonGrade, WidthToDistGrade, VerticalGrade, HorizontalGrade, TotalScore;
+			//ratios roughly equal
+
+
+			//width of box to dist between ratio
+
+			//if gear, y loc roughly same (horizontal), else if boiler, x roughly same (vertical)
+
+			double yDiff = abs(yC[0] - yC[1]);
+			if (yDiff > 400 )
+				HorizontalGrade = 0;
+			else
+				HorizontalGrade = WEIGHT - (yDiff*.2); //every pixel 1/2 point reduction
+
+
+			//
+
+			TotalScore = HorizontalGrade;
+
+			if (TotalScore >15)
+				line(original, Point(xC[0],yC[0]), Point(xC[1],yC[1]), ORANGE, 2, 8);
+
+			if(params.Debug)
+						{
+							cout<<"Comparison Grade: "<<i<<endl;
+							cout<<"\tyDiff: "<<yDiff<<endl;
+//							cout<<"\tY: "<<box.y<<endl;
+//							cout<<"\tHeight: "<<box.height<<endl;
+//							cout<<"\tWidth: "<<box.width<<endl;
+//							cout<<"\tangle: "<<minRect[i].angle<<endl;
+//							cout<<"\tRatio (W/H): "<<WHRatio<<endl;
+//							cout<<"\tRatio (H/W): "<<HWRatio<<endl;
+//							cout<<"\tArea: "<<box.height*box.width<<endl;
+
+							cout<<"\tHorizontalGrade: "<<HorizontalGrade<<endl;
+//							cout<<"\tratioGrade: "<<WHRatioGrade<<endl;
+//							cout<<"\tdistGrade: "<<distGrade<<endl;
+//							cout<<"\tbearGrade: "<<bearingGrade<<endl;
+//							cout<<"\tTotalScore: "<<score<<endl;
+
+
+
+						}
+
+
+		}
 		else
 		{
 			cout<<"No Winner"<<endl;
@@ -875,6 +940,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 					output << "Angle (Center): " << targets.targetBearingCenter;
 					putText(original, output.str(), Point(center.x + 10, center.y + 85), FONT_HERSHEY_PLAIN, 1, WHITE, 1, 1);
 		}
+
 
 
 
@@ -1320,7 +1386,14 @@ void *TCP_Send_Thread(void *args)
 				targets.isProcessThreadRunning << "," <<
 				targets.cameraConnected << "," <<
 				targets.isMjpegClientConnected << "," <<
-				targets.isTargetDetected << endl;
+				targets.isTargetDetected << "," <<
+				minH << "," <<
+				maxH << "," <<
+				minS << "," <<
+				maxS << "," <<
+				minV << "," <<
+				maxV << "," <<
+				 endl;
 
 		//send message over pipe
 		bool successfull = client.send_data(message.str());
@@ -1376,9 +1449,34 @@ void *TCP_Recv_Thread(void *args)
 
 	while (true)
 	{
+
+
 		//Set Match State, should be single int
 		pthread_mutex_lock(&matchStartMutex);
-		targets.matchStart = atoi(client.receive(5).c_str());
+
+		//split string (expect 16 data fields)
+		unsigned int numOfData = 8;
+		string dataReceived[numOfData];
+		unsigned int i = 0;
+		stringstream ssin(client.receive(20).c_str());
+
+		while (ssin.good() && i < numOfData){
+		    ssin >> dataReceived[i];
+		        ++i;
+		    }
+
+		    for(i = 0; i < numOfData; i++){
+		        cout << dataReceived[i] << endl;
+		    }
+
+
+		targets.matchStart = atoi(dataReceived[0].c_str());
+		minH = atoi(dataReceived[2].c_str());
+		maxH = atoi(dataReceived[3].c_str());
+		minS = atoi(dataReceived[4].c_str());
+		maxS = atoi(dataReceived[5].c_str());
+		minV = atoi(dataReceived[6].c_str());
+		maxV = atoi(dataReceived[7].c_str());
 
 		if(!targets.matchStart)
 		{
@@ -1812,13 +1910,15 @@ void onMouse( int event, int x, int y, int, void* param)
 			mouse_v = (int)hsv.at<Vec3b>(y, x)[2];
 
 			cout<< "x: "<<x << ", y: "<<y<<endl;
-			depthAtPoint = cam.getDepthAtPoint(x, y); //(int)hsv.at<Vec3b>(y, x)[3];//
 
-			cam.setZEDBrightness(zedBrightness);
-			cam.setZEDContrast(zedContrast);
-			cam.setZEDExposure(zedExposure);
-			cam.setZEDHue(zedHue);
-			cam.setZEDSaturation(zedSat);
-			cam.setZEDGain(zedGain);
+
+//			depthAtPoint = cam.getDepthAtPoint(x, y); //(int)hsv.at<Vec3b>(y, x)[3];//
+//
+//			cam.setZEDBrightness(zedBrightness);
+//			cam.setZEDContrast(zedContrast);
+//			cam.setZEDExposure(zedExposure);
+//			cam.setZEDHue(zedHue);
+//			cam.setZEDSaturation(zedSat);
+//			cam.setZEDGain(zedGain);
 }
 
