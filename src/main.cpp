@@ -27,6 +27,10 @@
 #include <signal.h> //to ignore sigpipe
 #include <sys/time.h>
 #include "zed.h"
+#include <iostream>
+#include <algorithm>
+#include <vector>
+#include <cstdio>
 
 
 
@@ -103,6 +107,7 @@ void CalculateDist(Target& targets);
 void CalculateBearing(Target& targets);
 double CalculateHorizontalAngle(double targetYPix, double targetHeightPix);
 void onMouse( int event, int x, int y, int, void* );
+double interpolate(double x, vector<pair<double, double> > table);
 
 //Threaded TCP Functions
 void *TCP_thread(void *args);
@@ -119,6 +124,7 @@ void rot90(cv::Mat &matImage, int rotflag);
 
 //GLOBAL CONSTANTS
 const double PI = 3.141592653589793;
+const double INF = 1.e100;
 
 ////Thresholding parameters
 //int minH = 30;
@@ -218,6 +224,10 @@ bool progRun;
 bool readyToStream;
 
 char tbuffer[30];
+
+
+//target grade functions
+vector<pair<double, double> > WHRatioGradePlot = { {-1000, 0}, {0, 0}, {0.4, 25}, {0.8, 0}, {1000, 0}};
 
 int main(int argc, const char* argv[])
 {
@@ -681,10 +691,11 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 				//angleGrade = WEIGHT - (WEIGHT* abs(minRect[i].angle) / 60);
 
 
-			if (WHRatio < 0.2 || WHRatio > 1)
+			if (WHRatio < -1 || WHRatio > 1)
 				WHRatioGrade = 0;
 			else
-				WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
+				WHRatioGrade = interpolate(WHRatio, WHRatioGradePlot);
+				//WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
 
 			if (dist > 400 || dist<=0)
 				distGrade = 0;
@@ -832,7 +843,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 
 							targets.Target = box;
-							targets.TargetBearing = bearing;
+							//targets.TargetBearing = bearing; //remove for 2017
 							targets.targetBearingCenter = bearing_center;
 							targets.targetDistance = dist;
 							targets.targetScore = contour1Score;
@@ -870,8 +881,16 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 			TotalScore = HorizontalGrade;
 
 			if (TotalScore >15)
+			{
 				line(original, Point(xC[0],yC[0]), Point(xC[1],yC[1]), ORANGE, 2, 8);
 
+			//find the left most target and use to calculate center of line between them
+			if (xC[0] < xC[1])
+				targets.TargetBearing = CalculateBearing(xC[0], xC[1] - xC[0]);
+			else
+				targets.TargetBearing = CalculateBearing(xC[1], xC[0] - xC[1]);
+
+			}
 			if(params.Debug)
 						{
 							cout<<"Comparison Grade: "<<i<<endl;
@@ -1921,4 +1940,25 @@ void onMouse( int event, int x, int y, int, void* param)
 //			cam.setZEDSaturation(zedSat);
 //			cam.setZEDGain(zedGain);
 }
+
+
+
+double interpolate(double x, vector<pair<double, double> > table) {
+    // Assumes that "table" is sorted by .first
+    // Check if x is out of bound
+    if (x > table.back().first) return -INF;
+    if (x < table[0].first) return -INF;
+    vector<pair<double, double> >::iterator it, it2;
+    // INFINITY is defined in math.h in the glibc implementation
+    it = lower_bound(table.begin(), table.end(), make_pair(x, -INF));
+    // Corner case
+    if (it == table.begin()) return it->second;
+    it2 = it;
+    --it2;
+    return it2->second + (it->second - it2->second)*(x - it2->first)/(it->first - it2->first);
+}
+
+
+
+
 
