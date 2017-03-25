@@ -24,6 +24,7 @@ private:
 	int viewID = 0;
 	sl::zed::SENSING_MODE dm_type = sl::zed::STANDARD;
 	float* depthData;
+	bool ZEDInit;
 
 public:
 	ZedInterface();
@@ -43,6 +44,7 @@ public:
     void setZEDSaturation(int value);
     void setZEDGain(int value);
     void setZedCamSetting(int zedBrightness, int zedContrast, int zedExposure, int zedHue, int zedSat, int zedGain);
+    bool isZEDInit();
 
 };
 

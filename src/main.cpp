@@ -363,7 +363,7 @@ int main(int argc, const char* argv[])
 					string camTune = "came Tune";
 					imshow(camTune, img);
 //
-					if(cam != NULL){
+					if(cam.isZEDInit()){
 
 						createTrackbar("ZED Brightness",camTune, &zedBrightness, 8, NULL );
 						createTrackbar("ZED Contrast",camTune, &zedContrast, 8, NULL );
@@ -646,6 +646,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 	double contour0Score =0;
 	double contour1Score = 0;
 	bool contour0 = false;
+	double slopeAngle;
 
 	//run through 2 large contours to grade them to get BEST target
 	if (!contours.empty() && !hierarchy.empty())
@@ -784,7 +785,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 			}
 
-			double slopeAngle = atan2(yC[1] - yC[0], xC[1] - xC[0]);
+			slopeAngle = atan2(yC[1] - yC[0], xC[1] - xC[0]);
 
 			if(i==0){
 				contour0Score=score;
@@ -2015,7 +2016,7 @@ void onMouse( int event, int x, int y, int, void* img)
 			cout<< "x: "<<x << ", y: "<<y<<endl;
 
 
-			if(cam!=NULL)
+			if(cam.isZEDInit())
 			{
 
 				depthAtPoint = cam.getDepthAtPoint(x, y); //(int)hsv.at<Vec3b>(y, x)[3];//

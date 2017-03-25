@@ -12,6 +12,7 @@ ZedInterface::ZedInterface()
 {
 	zedcam = new sl::zed::Camera(sl::zed::VGA);
 	std::cout<<"hello from zed";
+	ZEDInit = false;
 
 }
 
@@ -40,6 +41,7 @@ void ZedInterface::ZED_init()
 
 	zedcam->setDepthClampValue(20000);
 
+	ZEDInit = true;
 }
 
 void ZedInterface::ZED_init_VGA()
@@ -145,6 +147,11 @@ void ZedInterface::setZedCamSetting(int zedBrightness, int zedContrast, int zedE
 		setZEDHue(zedHue);
 		setZEDSaturation(zedSat);
 		setZEDGain(zedGain);
+}
+
+bool ZedInterface::isZEDInit()
+{
+	return ZEDInit;
 }
 
 
