@@ -165,8 +165,8 @@ static int mouse_s = -1;
 static int mouse_v = -1;
 double depthAtPoint = -1;
 
-int FOV_WIDTH_PIX = 640;
-int  FOV_HEIGHT_PIX = 480;
+int FOV_WIDTH_PIX = 320;
+int  FOV_HEIGHT_PIX = 240;
 int TARGET_SCORE = 55;
 
 
@@ -224,6 +224,8 @@ bool progRun;
 bool readyToStream;
 
 char tbuffer[30];
+
+cv::VideoCapture vcap;
 
 
 //target grade functions
@@ -315,7 +317,7 @@ int main(int argc, const char* argv[])
 
 			//start clock to determine our processing time;
 			clock_gettime(CLOCK_REALTIME, &start);
-			pthread_mutex_lock(&frameMutex);
+			//pthread_mutex_lock(&frameMutex);
 
 			//Only run processing thread on new frames, if a new frame
 			//isn't available this thread will sleep, until the frame
@@ -338,8 +340,8 @@ int main(int argc, const char* argv[])
 					if(mouse_h != -1)
 					{
 						ostringstream output;
-						output << "H_Val: " << mouse_h <<"    S_Val: "<<mouse_s<<"    V_val: "<<mouse_v <<"    dist: "<<depthAtPoint;
-						putText(img, output.str(), Point(100 + 10, 100 + 60), FONT_HERSHEY_PLAIN, 1, WHITE, 1, 1);
+						output << "H_Val: " << mouse_h <<"  S_Val: "<<mouse_s<<"  V_val: "<<mouse_v <<"  dist: "<<depthAtPoint;
+						putText(img, output.str(), Point(20 + 10, 20 + 20), FONT_HERSHEY_PLAIN, 1, WHITE, 1, 1);
 
 					}
 
@@ -357,11 +359,18 @@ int main(int argc, const char* argv[])
 
 					string camTune = "came Tune";
 					imshow(camTune, img);
-					createTrackbar("ZED Brightness",camTune, &zedBrightness, 8, NULL );
-					createTrackbar("ZED Contrast",camTune, &zedContrast, 8, NULL );
+//					createTrackbar("ZED Brightness",camTune, &zedBrightness, 8, NULL );
+//					createTrackbar("ZED Contrast",camTune, &zedContrast, 8, NULL );
+//					createTrackbar("ZED Exposure",camTune, &zedExposure, 100, NULL );
+//					createTrackbar("ZED Hue",camTune, &zedHue, 11, NULL );
+//					createTrackbar("ZED Saturation",camTune, &zedSat, 8, NULL );
+//					createTrackbar("ZED Gain",camTune, &zedGain, 100, NULL );
+
+					createTrackbar("ZED Brightness",camTune, &zedBrightness, 100, NULL );
+					createTrackbar("ZED Contrast",camTune, &zedContrast, 100, NULL );
 					createTrackbar("ZED Exposure",camTune, &zedExposure, 100, NULL );
-					createTrackbar("ZED Hue",camTune, &zedHue, 11, NULL );
-					createTrackbar("ZED Saturation",camTune, &zedSat, 8, NULL );
+					createTrackbar("ZED Hue",camTune, &zedHue, 100, NULL );
+					createTrackbar("ZED Saturation",camTune, &zedSat, 100, NULL );
 					createTrackbar("ZED Gain",camTune, &zedGain, 100, NULL );
 
 
@@ -1466,6 +1475,8 @@ void *TCP_Recv_Thread(void *args)
 	int count2 = 0;
 	struct timespec end;
 
+	ProgParams *struct_ptr = (ProgParams *) args;
+
 	while (true)
 	{
 
@@ -1490,13 +1501,16 @@ void *TCP_Recv_Thread(void *args)
 
 
 		targets.matchStart = atoi(dataReceived[0].c_str());
-		minH = atoi(dataReceived[2].c_str());
-		maxH = atoi(dataReceived[3].c_str());
-		minS = atoi(dataReceived[4].c_str());
-		maxS = atoi(dataReceived[5].c_str());
-		minV = atoi(dataReceived[6].c_str());
-		maxV = atoi(dataReceived[7].c_str());
 
+		if(!struct_ptr->Threshold)
+			{
+			minH = atoi(dataReceived[2].c_str());
+			maxH = atoi(dataReceived[3].c_str());
+			minS = atoi(dataReceived[4].c_str());
+			maxS = atoi(dataReceived[5].c_str());
+			minV = atoi(dataReceived[6].c_str());
+			maxV = atoi(dataReceived[7].c_str());
+		}
 		if(!targets.matchStart)
 		{
 			count1=0;
@@ -1583,7 +1597,7 @@ void *VideoCap(void *args)
 		//start timer to time how long it takes to open stream
 		clock_gettime(CLOCK_REALTIME, &start);
 
-		cv::VideoCapture vcap;
+
 
 
 		// For IP cam this works on a AXIS M1013
@@ -1615,16 +1629,17 @@ void *VideoCap(void *args)
 			//After Opening Camera we need to configure the returned image setting
 			//all opencv v4l2 camera controls scale from 0.0 - 1.0
 
+
 //Remove 2 lines If Tegra
-//			vcap.set(CV_CAP_PROP_EXPOSURE_AUTO, 1);
-//			vcap.set(CV_CAP_PROP_EXPOSURE_ABSOLUTE, 0.1);
+			//vcap.set(CV_CAP_PROP_EXPOSURE, 0);
+			//vcap.set(CV_CAP_PROP_GAIN, 0.5);
 
-
-//			vcap.set(CV_CAP_PROP_BRIGHTNESS, 0);
-//			vcap.set(CV_CAP_PROP_CONTRAST, 0.5);
+			//vcap.set(CV_CAP_PROP_BRIGHTNESS, 0);
+			//vcap.set(CV_CAP_PROP_CONTRAST, 0.5);
 
 			cout<<vcap.get(CV_CAP_PROP_FRAME_WIDTH)<<endl;
 			cout<<vcap.get(CV_CAP_PROP_FRAME_HEIGHT)<<endl;
+			cout<<vcap.get(CV_CAP_PROP_EXPOSURE)<<endl;
 
 		}
 		else if(struct_ptr->USE_ZED)
@@ -1753,6 +1768,7 @@ void *VideoCap(void *args)
 			pthread_mutex_lock(&frameMutex);
 			isFrameCopyComplete=false;
 			vcap.read(frame);
+			resize(frame,frame,Size(320,240));
 			isFrameCopyComplete=true;
 			pthread_mutex_unlock(&frameMutex);
 			pthread_cond_signal(&FrameCopyCompleteSignal);
@@ -1939,6 +1955,15 @@ void onMouse( int event, int x, int y, int, void* param)
 //			cam.setZEDHue(zedHue);
 //			cam.setZEDSaturation(zedSat);
 //			cam.setZEDGain(zedGain);
+
+
+			vcap.set(CV_CAP_PROP_EXPOSURE, zedExposure/100.0);
+			vcap.set(CV_CAP_PROP_BRIGHTNESS, zedBrightness/100.0);
+			vcap.set(CV_CAP_PROP_CONTRAST, zedContrast/100.0);
+			vcap.set(CV_CAP_PROP_SATURATION, zedSat/100.0);
+			vcap.set(CV_CAP_PROP_HUE, zedHue/100.0);
+			vcap.set(CV_CAP_PROP_GAIN, zedGain/100.0);
+
 }
 
 
