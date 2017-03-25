@@ -61,6 +61,8 @@ struct ProgParams
 	bool USE_DROID;
 	bool USE_ZED;
 	bool Threshold;
+	bool Gear;
+	bool Boiler;
 };
 
 //Stuct to hold information about targets found
@@ -1164,6 +1166,12 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
 				params.USE_ZED = false;
 				params.From_File = true;
 				i++;
+			}
+			else if ((string(argv[i]) == "-gear")) {
+				params.Gear = true;
+			}
+			else if ((string(argv[i]) == "-boiler")) {
+				params.Boiler = true;
 			}
 			else if ((string(argv[i]) == "-mp") && (i + 1 < argc))
 			{
