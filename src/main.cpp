@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <vector>
 #include <cstdio>
+#include <math.h>
 
 
 
@@ -361,20 +362,26 @@ int main(int argc, const char* argv[])
 
 					string camTune = "came Tune";
 					imshow(camTune, img);
-//					createTrackbar("ZED Brightness",camTune, &zedBrightness, 8, NULL );
-//					createTrackbar("ZED Contrast",camTune, &zedContrast, 8, NULL );
-//					createTrackbar("ZED Exposure",camTune, &zedExposure, 100, NULL );
-//					createTrackbar("ZED Hue",camTune, &zedHue, 11, NULL );
-//					createTrackbar("ZED Saturation",camTune, &zedSat, 8, NULL );
-//					createTrackbar("ZED Gain",camTune, &zedGain, 100, NULL );
+//
+					if(cam != NULL){
 
-					createTrackbar("ZED Brightness",camTune, &zedBrightness, 100, NULL );
-					createTrackbar("ZED Contrast",camTune, &zedContrast, 100, NULL );
-					createTrackbar("ZED Exposure",camTune, &zedExposure, 100, NULL );
-					createTrackbar("ZED Hue",camTune, &zedHue, 100, NULL );
-					createTrackbar("ZED Saturation",camTune, &zedSat, 100, NULL );
-					createTrackbar("ZED Gain",camTune, &zedGain, 100, NULL );
+						createTrackbar("ZED Brightness",camTune, &zedBrightness, 8, NULL );
+						createTrackbar("ZED Contrast",camTune, &zedContrast, 8, NULL );
+						createTrackbar("ZED Exposure",camTune, &zedExposure, 100, NULL );
+						createTrackbar("ZED Hue",camTune, &zedHue, 11, NULL );
+						createTrackbar("ZED Saturation",camTune, &zedSat, 8, NULL );
+						createTrackbar("ZED Gain",camTune, &zedGain, 100, NULL );
+					}
 
+					else{
+
+						createTrackbar("ZED Brightness",camTune, &zedBrightness, 100, NULL );
+						createTrackbar("ZED Contrast",camTune, &zedContrast, 100, NULL );
+						createTrackbar("ZED Exposure",camTune, &zedExposure, 100, NULL );
+						createTrackbar("ZED Hue",camTune, &zedHue, 100, NULL );
+						createTrackbar("ZED Saturation",camTune, &zedSat, 100, NULL );
+						createTrackbar("ZED Gain",camTune, &zedGain, 100, NULL );
+					}
 
 
 				}
@@ -647,6 +654,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 		int xC[contours.size()];
 		int yC[contours.size()];
 
+
 		for (unsigned int i = 0; i < contours.size(); i++)
 		{
 			//capture corners of contour
@@ -692,43 +700,91 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 			const int WEIGHT = 25;
 			double angleGrade, WHRatioGrade, distGrade, bearingGrade;
+			double score;
 
-			//0 if angle > 60,
-			//abs(angle) > 60 = 0
-			if ((abs(minRect[i].angle) >= 0 && abs(minRect[i].angle) < 22) || (abs(minRect[i].angle) > 77 && abs(minRect[i].angle) <= 90))
-				angleGrade = 25;
-			else
-				angleGrade = 0;
-				//angleGrade = WEIGHT - (WEIGHT* abs(minRect[i].angle) / 60);
+			if(params.Gear){
 
-
-			if (WHRatio < -1 || WHRatio > 1)
-				WHRatioGrade = 0;
-			else
-				WHRatioGrade = interpolate(WHRatio, WHRatioGradePlot);
-				//WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
-
-			if (dist > 400 || dist<=0)
-				distGrade = 0;
-			else
-				distGrade = WEIGHT - (WEIGHT* abs(dist-160) / 160);
-
-			bearingGrade = WEIGHT - abs(bearing);
+				//0 if angle > 60,
+				//abs(angle) > 60 = 0
+				if ((abs(minRect[i].angle) >= 0 && abs(minRect[i].angle) < 22) || (abs(minRect[i].angle) > 77 && abs(minRect[i].angle) <= 90))
+					angleGrade = 25;
+				else
+					angleGrade = 0;
+					//angleGrade = WEIGHT - (WEIGHT* abs(minRect[i].angle) / 60);
 
 
-			if(angleGrade < 0)
-				angleGrade = 0;
+				if (WHRatio < -1 || WHRatio > 1)
+					WHRatioGrade = 0;
+				else
+					WHRatioGrade = interpolate(WHRatio, WHRatioGradePlot);
+					//WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
 
-			if(WHRatioGrade < 0 )
-				WHRatioGrade = 0;
+				if (dist > 400 || dist<=0)
+					distGrade = 0;
+				else
+					distGrade = WEIGHT - (WEIGHT* abs(dist-160) / 160);
 
-			if(distGrade < 0)
-				distGrade = 0;
+				bearingGrade = WEIGHT - abs(bearing);
 
-			if(bearingGrade < 0)
-				bearingGrade = 0;
 
-			double score = angleGrade+WHRatioGrade+distGrade+bearingGrade;
+				if(angleGrade < 0)
+					angleGrade = 0;
+
+				if(WHRatioGrade < 0 )
+					WHRatioGrade = 0;
+
+				if(distGrade < 0)
+					distGrade = 0;
+
+				if(bearingGrade < 0)
+					bearingGrade = 0;
+
+				score = angleGrade+WHRatioGrade+distGrade+bearingGrade;
+
+			}
+
+			if(params.Boiler){
+
+				//0 if angle > 60,
+				//abs(angle) > 60 = 0
+				if ((abs(minRect[i].angle) >= 0 && abs(minRect[i].angle) < 22) || (abs(minRect[i].angle) > 77 && abs(minRect[i].angle) <= 90))
+					angleGrade = 25;
+				else
+					angleGrade = 0;
+					//angleGrade = WEIGHT - (WEIGHT* abs(minRect[i].angle) / 60);
+
+
+				if (WHRatio < -1 || WHRatio > 1)
+					WHRatioGrade = 0;
+				else
+					WHRatioGrade = interpolate(WHRatio, WHRatioGradePlot);
+					//WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
+
+				if (dist > 400 || dist<=0)
+					distGrade = 0;
+				else
+					distGrade = WEIGHT - (WEIGHT* abs(dist-160) / 160);
+
+				bearingGrade = WEIGHT - abs(bearing);
+
+
+				if(angleGrade < 0)
+					angleGrade = 0;
+
+				if(WHRatioGrade < 0 )
+					WHRatioGrade = 0;
+
+				if(distGrade < 0)
+					distGrade = 0;
+
+				if(bearingGrade < 0)
+					bearingGrade = 0;
+
+				score = angleGrade+WHRatioGrade+distGrade+bearingGrade;
+
+			}
+
+			double slopeAngle = atan2(yC[1] - yC[0], xC[1] - xC[0]);
 
 			if(i==0){
 				contour0Score=score;
@@ -765,6 +821,8 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 				cout<<"\tV Min:"<<minV<<endl;
 				cout<<"\tV Max:"<<maxV<<endl;
+
+				cout<<"\SlopeAngle:"<<slopeAngle<<endl;
 
 			}
 
@@ -1130,6 +1188,8 @@ void initializeParams(ProgParams& params)
 	params.USE_DROID = false;
 	params.USE_ZED = false;
 	params.Threshold = false;
+	params.Gear = true;
+	params.Boiler = false;
 
 }
 
@@ -1934,12 +1994,12 @@ void rot90(cv::Mat &matImage, int rotflag)
   }
 }
 
-void onMouse( int event, int x, int y, int, void* param)
+void onMouse( int event, int x, int y, int, void* img)
 {
     if( event != CV_EVENT_LBUTTONDOWN )
             return;
     Mat hsv;
-    Mat* rgb = (Mat*) param;
+    Mat* rgb = (Mat*) img;
     cvtColor(*rgb,hsv,COLOR_BGR2HSV);
 
 //            printf("%d %d: %d, %d, %d\n",
@@ -1955,22 +2015,30 @@ void onMouse( int event, int x, int y, int, void* param)
 			cout<< "x: "<<x << ", y: "<<y<<endl;
 
 
-//			depthAtPoint = cam.getDepthAtPoint(x, y); //(int)hsv.at<Vec3b>(y, x)[3];//
-//
-//			cam.setZEDBrightness(zedBrightness);
-//			cam.setZEDContrast(zedContrast);
-//			cam.setZEDExposure(zedExposure);
-//			cam.setZEDHue(zedHue);
-//			cam.setZEDSaturation(zedSat);
-//			cam.setZEDGain(zedGain);
+			if(cam!=NULL)
+			{
 
+				depthAtPoint = cam.getDepthAtPoint(x, y); //(int)hsv.at<Vec3b>(y, x)[3];//
 
-			vcap.set(CV_CAP_PROP_EXPOSURE, zedExposure/100.0);
-			vcap.set(CV_CAP_PROP_BRIGHTNESS, zedBrightness/100.0);
-			vcap.set(CV_CAP_PROP_CONTRAST, zedContrast/100.0);
-			vcap.set(CV_CAP_PROP_SATURATION, zedSat/100.0);
-			vcap.set(CV_CAP_PROP_HUE, zedHue/100.0);
-			vcap.set(CV_CAP_PROP_GAIN, zedGain/100.0);
+				cam.setZEDBrightness(zedBrightness);
+				cam.setZEDContrast(zedContrast);
+				cam.setZEDExposure(zedExposure);
+				cam.setZEDHue(zedHue);
+				cam.setZEDSaturation(zedSat);
+				cam.setZEDGain(zedGain);
+
+			}
+
+			else{
+
+				vcap.set(CV_CAP_PROP_EXPOSURE, zedExposure/100.0);
+				vcap.set(CV_CAP_PROP_BRIGHTNESS, zedBrightness/100.0);
+				vcap.set(CV_CAP_PROP_CONTRAST, zedContrast/100.0);
+				vcap.set(CV_CAP_PROP_SATURATION, zedSat/100.0);
+				vcap.set(CV_CAP_PROP_HUE, zedHue/100.0);
+				vcap.set(CV_CAP_PROP_GAIN, zedGain/100.0);
+			}
+
 
 }
 
