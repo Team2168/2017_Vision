@@ -1658,7 +1658,6 @@ void *VideoCap(void *args)
 			FOV_WIDTH_PIX = cam.getCameraWidth();
 			FOV_HEIGHT_PIX = cam.getCameraHeight();
 
-
 			cout << "It took " << diffClock(start,end) << " seconds to set up stream " << endl;
 
 			clock_gettime(CLOCK_REALTIME, &bufferStart);
@@ -1678,6 +1677,7 @@ void *VideoCap(void *args)
 					pthread_mutex_lock(&frameMutex);
 					isFrameCopyComplete=false;
 					cam.getCurrentImage(frame);
+					resize(frame,frame,Size(320,240));	// Resize the frame of the zed camera to 320, 240
 					isFrameCopyComplete=true;
 					pthread_mutex_unlock(&frameMutex);
 					pthread_cond_signal(&FrameCopyCompleteSignal);
