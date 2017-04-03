@@ -233,6 +233,26 @@ cv::VideoCapture vcap;
 
 //target grade functions
 vector<pair<double, double> > WHRatioGradePlot = { {-1000, 0}, {0, 0}, {0.4, 25}, {0.8, 0}, {1000, 0}};
+// my numbers for gear WH
+//vector<pair<double, double> > GearWHRatioGradePlot = { {0, 0}, {0.3, 23}, {0.4, 25}, {0.5, 23}, {0.7, 0} };
+////
+////// Gear lineSlope
+//vector<pair<double, double> > GearLineSlopeGradePlot = { {-90, 0}, {-10, 20}, {0, 25}, {10, 20}, {90, 0} };
+////
+////// Gear widthLine
+//vector<pair<double, double> > GearWLineRatioGradePlot = { {0, 0}, {0.16, 20}, {0.24, 25}, {0.34, 20}, {0.5, 0} };
+//
+////  boiler lineSlope
+//vector<pair<double, double> > BoilerLineSlopeGradePlot = { {0, 0}, {80, 20}, {90, 25}, {100, 20}, {180, 0} };
+//
+////  boiler WH ratio
+//vector<pair<double, double> > BoilerWHRatioGradePlot = { {20, 0}, {5.375, 25}, {7.17, 20}, {10.75, 25}, {0, 0} };
+//
+////  boiler widthLine
+//vector<pair<double, double> > BoilerWLineGradePlot = { {0, 0}, {0.086, 20}, {0.093, 25}, {0.1, 20}, {0.2, 0} };
+
+
+
 
 int main(int argc, const char* argv[])
 {
@@ -327,7 +347,7 @@ int main(int argc, const char* argv[])
 			//grabber thread signals the condition to wake this thread
 			//up
 			while(!isFrameCopyComplete)
-				pthread_cond_wait(&FrameCopyCompleteSignal, &frameMutex);
+			pthread_cond_wait(&FrameCopyCompleteSignal, &frameMutex);
 
 
 			if (!frame.empty())
@@ -363,7 +383,7 @@ int main(int argc, const char* argv[])
 					string camTune = "came Tune";
 					imshow(camTune, img);
 //
-					if(cam.isZEDInit()){
+					if(params.USE_ZED){
 
 						createTrackbar("ZED Brightness",camTune, &zedBrightness, 8, NULL );
 						createTrackbar("ZED Contrast",camTune, &zedContrast, 8, NULL );
@@ -646,7 +666,6 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 	double contour0Score =0;
 	double contour1Score = 0;
 	bool contour0 = false;
-	double slopeAngle;
 
 	//run through 2 large contours to grade them to get BEST target
 	if (!contours.empty() && !hierarchy.empty())
@@ -703,7 +722,8 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 			double angleGrade, WHRatioGrade, distGrade, bearingGrade;
 			double score;
 
-			if(params.Gear){
+			if(params.Gear)
+			{
 
 				//0 if angle > 60,
 				//abs(angle) > 60 = 0
@@ -761,6 +781,9 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 					WHRatioGrade = interpolate(WHRatio, WHRatioGradePlot);
 					//WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
 
+
+
+
 				if (dist > 400 || dist<=0)
 					distGrade = 0;
 				else
@@ -784,8 +807,6 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 				score = angleGrade+WHRatioGrade+distGrade+bearingGrade;
 
 			}
-
-			slopeAngle = atan2(yC[1] - yC[0], xC[1] - xC[0]);
 
 			if(i==0){
 				contour0Score=score;
@@ -822,8 +843,6 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 				cout<<"\tV Min:"<<minV<<endl;
 				cout<<"\tV Max:"<<maxV<<endl;
-
-				cout<<"\SlopeAngle:"<<slopeAngle<<endl;
 
 			}
 
@@ -939,6 +958,9 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 			//if gear, y loc roughly same (horizontal), else if boiler, x roughly same (vertical)
 
+			double slopeAngle = atan2(yC[1] - yC[0], xC[1] - xC[0]);
+
+
 			double yDiff = abs(yC[0] - yC[1]);
 			if (yDiff > 400 )
 				HorizontalGrade = 0;
@@ -965,6 +987,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 						{
 							cout<<"Comparison Grade: "<<i<<endl;
 							cout<<"\tyDiff: "<<yDiff<<endl;
+							cout<<"\SlopeAngle:"<<slopeAngle<<endl;
 //							cout<<"\tY: "<<box.y<<endl;
 //							cout<<"\tHeight: "<<box.height<<endl;
 //							cout<<"\tWidth: "<<box.width<<endl;
@@ -1230,9 +1253,11 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
 			}
 			else if ((string(argv[i]) == "-gear")) {
 				params.Gear = true;
+				params.Boiler = false;
 			}
 			else if ((string(argv[i]) == "-boiler")) {
 				params.Boiler = true;
+				params.Gear = false;
 			}
 			else if ((string(argv[i]) == "-mp") && (i + 1 < argc))
 			{
@@ -1571,15 +1596,15 @@ void *TCP_Recv_Thread(void *args)
 
 		targets.matchStart = atoi(dataReceived[0].c_str());
 
-		if(!struct_ptr->Threshold)
-			{
-			minH = atoi(dataReceived[2].c_str());
-			maxH = atoi(dataReceived[3].c_str());
-			minS = atoi(dataReceived[4].c_str());
-			maxS = atoi(dataReceived[5].c_str());
-			minV = atoi(dataReceived[6].c_str());
-			maxV = atoi(dataReceived[7].c_str());
-		}
+//		if(!struct_ptr->Threshold)
+//			{
+//			minH = atoi(dataReceived[2].c_str());
+//			maxH = atoi(dataReceived[3].c_str());
+//			minS = atoi(dataReceived[4].c_str());
+//			maxS = atoi(dataReceived[5].c_str());
+//			minV = atoi(dataReceived[6].c_str());
+//			maxV = atoi(dataReceived[7].c_str());
+//		}
 		if(!targets.matchStart)
 		{
 			count1=0;
