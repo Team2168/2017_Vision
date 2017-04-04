@@ -232,24 +232,17 @@ cv::VideoCapture vcap;
 
 
 //target grade functions
-vector<pair<double, double> > WHRatioGradePlot = { {-1000, 0}, {0, 0}, {0.4, 25}, {0.8, 0}, {1000, 0}};
-// my numbers for gear WH
-//vector<pair<double, double> > GearWHRatioGradePlot = { {0, 0}, {0.3, 23}, {0.4, 25}, {0.5, 23}, {0.7, 0} };
-////
-////// Gear lineSlope
-//vector<pair<double, double> > GearLineSlopeGradePlot = { {-90, 0}, {-10, 20}, {0, 25}, {10, 20}, {90, 0} };
-////
-////// Gear widthLine
-//vector<pair<double, double> > GearWLineRatioGradePlot = { {0, 0}, {0.16, 20}, {0.24, 25}, {0.34, 20}, {0.5, 0} };
-//
-////  boiler lineSlope
-//vector<pair<double, double> > BoilerLineSlopeGradePlot = { {0, 0}, {80, 20}, {90, 25}, {100, 20}, {180, 0} };
-//
-////  boiler WH ratio
-//vector<pair<double, double> > BoilerWHRatioGradePlot = { {20, 0}, {5.375, 25}, {7.17, 20}, {10.75, 25}, {0, 0} };
-//
-////  boiler widthLine
-//vector<pair<double, double> > BoilerWLineGradePlot = { {0, 0}, {0.086, 20}, {0.093, 25}, {0.1, 20}, {0.2, 0} };
+vector<pair<double, double> > GearWHRatioGradePlot = { {-1000, 0}, {0, 0}, {0.3, 23}, {0.4, 25}, {0.5, 23}, {0.7, 0}, {1000, 0} };
+
+vector<pair<double, double> > GearLineSlopeGradePlot = { {-1000, 0}, {-90, 0}, {-10, 20}, {0, 25}, {10, 20}, {90, 0}, {1000, 0} };
+
+vector<pair<double, double> > GearWLineRatioGradePlot = { {-1000, 0}, {0, 0}, {0.16, 20}, {0.24, 25}, {0.34, 20}, {0.5, 0}, {1000, 0} };
+
+vector<pair<double, double> > BoilerLineSlopeGradePlot = { {-1000, 0}, {0, 0}, {80, 20}, {90, 25}, {100, 20}, {180, 0}, {1000, 0} };
+
+vector<pair<double, double> > BoilerWHRatioGradePlot = { {-1000, 0}, {0, 0}, {5.375, 25}, {7.17, 20}, {10.75, 25}, {15, 0}, {1000, 0} };
+
+vector<pair<double, double> > BoilerWLineGradePlot = { {-1000, 0}, {0, 0}, {0.086, 20}, {0.093, 25}, {0.1, 20}, {0.2, 0}, {1000, 0} };
 
 
 
@@ -734,11 +727,8 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 					//angleGrade = WEIGHT - (WEIGHT* abs(minRect[i].angle) / 60);
 
 
-				if (WHRatio < -1 || WHRatio > 1)
-					WHRatioGrade = 0;
-				else
-					WHRatioGrade = interpolate(WHRatio, WHRatioGradePlot);
-					//WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
+				WHRatioGrade = interpolate(WHRatio, GearWHRatioGradePlot);
+
 
 				if (dist > 400 || dist<=0)
 					distGrade = 0;
@@ -775,12 +765,9 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 					//angleGrade = WEIGHT - (WEIGHT* abs(minRect[i].angle) / 60);
 
 
-				if (WHRatio < -1 || WHRatio > 1)
-					WHRatioGrade = 0;
-				else
-					WHRatioGrade = interpolate(WHRatio, WHRatioGradePlot);
-					//WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
-
+				WHRatioGrade = interpolate(WHRatio, BoilerWHRatioGradePlot);
+				//WHRatioGrade = WEIGHT - (WEIGHT*abs(WHRatio-0.4)/0.4);
+				cout<<"From Boiler"<<endl<<endl;
 
 
 
@@ -946,11 +933,11 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 		}
 
 
-		//additional scoring
+		//additional scoring on both contours
 		if(contour1Score >= TARGET_SCORE && contour0Score >= TARGET_SCORE)
 		{
 			const int WEIGHT = 25;
-			double WHRatioComparisonGrade, WidthToDistGrade, VerticalGrade, HorizontalGrade, TotalScore;
+			double WHRatioComparisonGrade, WidthToDistGrade, LineAngleGrade, TotalScore;
 			//ratios roughly equal
 
 
@@ -958,19 +945,18 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 			//if gear, y loc roughly same (horizontal), else if boiler, x roughly same (vertical)
 
-			double slopeAngle = atan2(yC[1] - yC[0], xC[1] - xC[0]);
+			double slopeAngle = abs(atan2(yC[1] - yC[0], xC[1] - xC[0])* 180 / PI); //convert to radians
 
 
-			double yDiff = abs(yC[0] - yC[1]);
-			if (yDiff > 400 )
-				HorizontalGrade = 0;
-			else
-				HorizontalGrade = WEIGHT - (yDiff*.2); //every pixel 1/2 point reduction
 
+			if (params.Boiler)
+				LineAngleGrade = interpolate(slopeAngle, BoilerLineSlopeGradePlot);
+			if (params.Gear)
+				LineAngleGrade = interpolate(slopeAngle, GearLineSlopeGradePlot);
 
 			//
 
-			TotalScore = HorizontalGrade;
+			TotalScore = LineAngleGrade;
 
 			if (TotalScore >15)
 			{
@@ -986,17 +972,9 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 			if(params.Debug)
 						{
 							cout<<"Comparison Grade: "<<i<<endl;
-							cout<<"\tyDiff: "<<yDiff<<endl;
 							cout<<"\SlopeAngle:"<<slopeAngle<<endl;
-//							cout<<"\tY: "<<box.y<<endl;
-//							cout<<"\tHeight: "<<box.height<<endl;
-//							cout<<"\tWidth: "<<box.width<<endl;
-//							cout<<"\tangle: "<<minRect[i].angle<<endl;
-//							cout<<"\tRatio (W/H): "<<WHRatio<<endl;
-//							cout<<"\tRatio (H/W): "<<HWRatio<<endl;
-//							cout<<"\tArea: "<<box.height*box.width<<endl;
 
-							cout<<"\tHorizontalGrade: "<<HorizontalGrade<<endl;
+							cout<<"\tLineSlopeGrade: "<<LineAngleGrade<<endl;
 //							cout<<"\tratioGrade: "<<WHRatioGrade<<endl;
 //							cout<<"\tdistGrade: "<<distGrade<<endl;
 //							cout<<"\tbearGrade: "<<bearingGrade<<endl;
@@ -1589,9 +1567,10 @@ void *TCP_Recv_Thread(void *args)
 		        ++i;
 		    }
 
-		    for(i = 0; i < numOfData; i++){
-		        cout << dataReceived[i] << endl;
-		    }
+		//print data
+//		    for(i = 0; i < numOfData; i++){
+//		        cout << dataReceived[i] << endl;
+//		    }
 
 
 		targets.matchStart = atoi(dataReceived[0].c_str());
@@ -1738,22 +1717,39 @@ void *VideoCap(void *args)
 		}
 		else if(struct_ptr->USE_ZED)
 		{
+			std::cout<<"Trying to connect to ZED... "<<std::endl;
 
-			//Initialize Zed Camera
+			int count =1;
 
-			cam.ZED_init_VGA();
-			cam.setZEDBrightness(zedBrightness);
-			cam.setZEDContrast(zedContrast);
-			cam.setZEDExposure(zedExposure);
-			cam.setZEDHue(zedHue);
-			cam.setZEDSaturation(zedSat);
-			cam.setZEDGain(zedGain);
+			//open the video stream and make sure it's opened
+			//We specify desired frame size and fps in constructor
+			//Camera must be able to support specified framesize and frames per second
+			//or this will set camera to defaults
+			//while (!vcap.open(videoStreamAddress, 320,240,20))
+			while (!cam.isZEDInit())
+			{
+				std::cout << "Error connecting to camera stream, retrying " << count<< std::endl;
 
-			FOV_WIDTH_PIX = cam.getCameraWidth();
-			FOV_HEIGHT_PIX = cam.getCameraHeight();
+				//Initialize Zed Camera
+
+				cam.ZED_init_VGA();
+				cam.setZEDBrightness(zedBrightness);
+				cam.setZEDContrast(zedContrast);
+				cam.setZEDExposure(zedExposure);
+				cam.setZEDHue(zedHue);
+				cam.setZEDSaturation(zedSat);
+				cam.setZEDGain(zedGain);
+
+
+				count++;
+				usleep(1000000);
+			}
+
 
 			cout << "It took " << diffClock(start,end) << " seconds to set up stream " << endl;
 
+			FOV_WIDTH_PIX = cam.getCameraWidth();
+			FOV_HEIGHT_PIX = cam.getCameraHeight();
 			clock_gettime(CLOCK_REALTIME, &bufferStart);
 
 			//First iteration of Loop will clear stream buffer for preset amount
@@ -2057,7 +2053,11 @@ void onMouse( int event, int x, int y, int, void* img)
 
 			else{
 
-				vcap.set(CV_CAP_PROP_EXPOSURE, zedExposure/100.0);
+				std::ostringstream stream;
+				stream << "v4l2-ctl --set-ctrl=exposure_absolute=" << zedExposure;
+
+				system(stream.str().c_str());
+				//vcap.set(CV_CAP_PROP_EXPOSURE, zedExposure/100.0);
 				vcap.set(CV_CAP_PROP_BRIGHTNESS, zedBrightness/100.0);
 				vcap.set(CV_CAP_PROP_CONTRAST, zedContrast/100.0);
 				vcap.set(CV_CAP_PROP_SATURATION, zedSat/100.0);

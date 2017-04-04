@@ -41,7 +41,8 @@ void ZedInterface::ZED_init()
 
 	zedcam->setDepthClampValue(20000);
 
-	ZEDInit = true;
+	if (sl::zed::errcode2str(err) == "SUCCESS")
+		ZEDInit = true;
 }
 
 void ZedInterface::ZED_init_VGA()
