@@ -26,6 +26,7 @@ void ZedInterface::ZED_init()
     params.coordinate = sl::zed::IMAGE;
 
 
+
     // Enables verbosity in the console
     params.verbose = true;
 
@@ -34,8 +35,10 @@ void ZedInterface::ZED_init()
     sl::zed::ERRCODE err = zedcam->init(params);
 
     //put cam on single core
-    sl::zed::Camera::sticktoCPUCore(2);
+    sl::zed::Camera::sticktoCPUCore(3);
     sl::zed::ZED_SELF_CALIBRATION_STATUS old_self_calibration_status = sl::zed::SELF_CALIBRATION_NOT_CALLED;
+
+
 
     viewID = 0;	// Define a struct of parameters for the initialization
 
@@ -47,13 +50,13 @@ void ZedInterface::ZED_init()
 
 void ZedInterface::ZED_init_VGA()
 {
-	zedcam = new sl::zed::Camera(sl::zed::VGA);
+	zedcam = new sl::zed::Camera(sl::zed::VGA,20);
 	ZED_init();
 }
 
 void ZedInterface::ZED_init_HD720()
 {
-	zedcam = new sl::zed::Camera(sl::zed::HD720);
+	zedcam = new sl::zed::Camera(sl::zed::HD720,20);
 	ZED_init();
 }
 

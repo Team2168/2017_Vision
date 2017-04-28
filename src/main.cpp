@@ -222,6 +222,8 @@ int zedHue = 5; //0 11
 int zedSat = 4; //0 8
 int zedGain = -1; //-1 100
 
+int scale;
+
 //Control process thread exectution
 bool progRun;
 bool readyToStream;
@@ -240,9 +242,9 @@ vector<pair<double, double> > GearWLineRatioGradePlot = { {-1000, 0}, {0, 0}, {0
 
 vector<pair<double, double> > BoilerLineSlopeGradePlot = { {-1000, 0}, {0, 0}, {80, 20}, {90, 25}, {100, 20}, {180, 0}, {1000, 0} };
 
-vector<pair<double, double> > BoilerWHRatioGradePlot = { {-1000, 0}, {0, 0}, {5.375, 25}, {7.17, 20}, {10.75, 25}, {15, 0}, {1000, 0} };
+vector<pair<double, double> > BoilerWHRatioGradePlot = { {-1000, 0}, {0, 0}, {5.375/2, 25}, {7.17/2, 20}, {10.75/2, 25}, {15/2.0, 0}, {1000, 0} };
 
-vector<pair<double, double> > BoilerWLineGradePlot = { {-1000, 0}, {0, 0}, {0.086, 20}, {0.093, 25}, {0.1, 20}, {0.2, 0}, {1000, 0} };
+vector<pair<double, double> > BoilerLineDistRatioGradePlot = { {-1000, 0}, {0.0, 0}, {2/7.0, 25}, {7.0/7.0, 25}, {1.2, 0}, {1000, 0} };
 
 
 
@@ -321,7 +323,7 @@ int main(int argc, const char* argv[])
 		//this bool, is enabled by the mjpeg thread
 		//once it is up to 10fps
 
-		if (params.Process && progRun)
+		if (progRun)
 		{
 
 			//Lock Targets and determine goals
@@ -371,6 +373,7 @@ int main(int argc, const char* argv[])
 					createTrackbar( "Saturation_Max",window, &maxS, 255,NULL );
 					createTrackbar( "Value_Min",window, &minV, 255,NULL);
 					createTrackbar( "Value_Max",window, &maxV, 255,NULL);
+					createTrackbar( "Zoom",window, &scale, 100,NULL);
 
 
 					string camTune = "came Tune";
@@ -402,12 +405,15 @@ int main(int argc, const char* argv[])
 
 
 
-
-				thresholded = ThresholdImage(img);
+				if(params.Process)
+				{
+					thresholded = ThresholdImage(img);
+				}
 
 				//Lock Targets and determine goals
 				pthread_mutex_lock(&targetMutex);
 				findTarget(img, thresholded, targets, params);
+
 
 				if(params.Debug)
 				{
@@ -552,6 +558,15 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 	}
 
 
+	//Rotate image
+		if(params.ROTATE == 1 || params.ROTATE == 2 || params.ROTATE == 3)
+			rot90(original,params.ROTATE);
+
+
+
+
+	if(params.Process)
+	{
 	vector<Vec4i> hierarchy;
 	vector<vector<Point> > contours;
 
@@ -644,9 +659,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 	}
 
 
-	//Rotate image
-		if(params.ROTATE == 1 || params.ROTATE == 2 || params.ROTATE == 3)
-			rot90(original,params.ROTATE);
+
 
 
 	/// Draw contours
@@ -758,7 +771,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 				//0 if angle > 60,
 				//abs(angle) > 60 = 0
-				if ((abs(minRect[i].angle) >= 0 && abs(minRect[i].angle) < 22) || (abs(minRect[i].angle) > 77 && abs(minRect[i].angle) <= 90))
+				if ((abs(minRect[i].angle) >= 0 && abs(minRect[i].angle) < 32) || (abs(minRect[i].angle) > 67 && abs(minRect[i].angle) <= 90))
 					angleGrade = 25;
 				else
 					angleGrade = 0;
@@ -770,13 +783,15 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 				cout<<"From Boiler"<<endl<<endl;
 
 
-
 				if (dist > 400 || dist<=0)
 					distGrade = 0;
 				else
 					distGrade = WEIGHT - (WEIGHT* abs(dist-160) / 160);
 
-				bearingGrade = WEIGHT - abs(bearing);
+				if(abs(bearing)>=0.0)
+					bearingGrade = 25;
+				else
+					bearingGrade = 0;
 
 
 				if(angleGrade < 0)
@@ -871,7 +886,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 
 						targets.Target = box;
-						targets.TargetBearing = bearing;
+						//targets.TargetBearing = bearing;
 						targets.targetBearingCenter = bearing_center;
 						targets.targetDistance = dist;
 						targets.targetScore = contour0Score;
@@ -947,18 +962,28 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 
 			double slopeAngle = abs(atan2(yC[1] - yC[0], xC[1] - xC[0])* 180 / PI); //convert to radians
 
+			Rect box = minRect[i].boundingRect();
 
+			double lineDist = sqrt(pow((yC[1] - yC[0]),2) + pow((xC[1] - xC[0]),2));
+
+			double HLineRatio = box.height/lineDist;
 
 			if (params.Boiler)
+			{
 				LineAngleGrade = interpolate(slopeAngle, BoilerLineSlopeGradePlot);
+				WidthToDistGrade = interpolate(HLineRatio,BoilerLineDistRatioGradePlot);
+			}
 			if (params.Gear)
+			{
 				LineAngleGrade = interpolate(slopeAngle, GearLineSlopeGradePlot);
+				WidthToDistGrade = 20;
+			}
 
 			//
 
-			TotalScore = LineAngleGrade;
+			TotalScore = LineAngleGrade + WidthToDistGrade;
 
-			if (TotalScore >15)
+			if (TotalScore >35)
 			{
 				line(original, Point(xC[0],yC[0]), Point(xC[1],yC[1]), ORANGE, 2, 8);
 
@@ -973,8 +998,11 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 						{
 							cout<<"Comparison Grade: "<<i<<endl;
 							cout<<"\SlopeAngle:"<<slopeAngle<<endl;
-
+							cout<<"\HLineRatio:"<<HLineRatio<<endl;
+							cout<<"\WidthLineDistGrade:"<<WidthToDistGrade<<endl;
 							cout<<"\tLineSlopeGrade: "<<LineAngleGrade<<endl;
+
+
 //							cout<<"\tratioGrade: "<<WHRatioGrade<<endl;
 //							cout<<"\tdistGrade: "<<distGrade<<endl;
 //							cout<<"\tbearGrade: "<<bearingGrade<<endl;
@@ -1082,6 +1110,7 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 		imwrite(fileSave,original);
 		cout<<"writing_to_file: "<<fileSave<<endl<<endl;
 	}
+}
 
 	//If there is contours, this will stream the contours over the original image, if there is no contours
 	//this will stream the camera feed. There will always be a stream
@@ -1703,12 +1732,20 @@ void *VideoCap(void *args)
 			//all opencv v4l2 camera controls scale from 0.0 - 1.0
 
 
-//Remove 2 lines If Tegra
-			//vcap.set(CV_CAP_PROP_EXPOSURE, 0);
-			//vcap.set(CV_CAP_PROP_GAIN, 0.5);
+			std::ostringstream stream;
+			stream << "v4l2-ctl --set-ctrl=exposure_auto=" << 3;
+			system(stream.str().c_str());
 
-			//vcap.set(CV_CAP_PROP_BRIGHTNESS, 0);
-			//vcap.set(CV_CAP_PROP_CONTRAST, 0.5);
+
+			stream.clear();
+			stream << "v4l2-ctl --set-ctrl=saturation=" << 84;
+			system(stream.str().c_str());
+			//vcap.set(CV_CAP_PROP_EXPOSURE, zedExposure/100.0);
+			//vcap.set(CV_CAP_PROP_BRIGHTNESS, 50/100.0);
+			//vcap.set(CV_CAP_PROP_CONTRAST, 4/100.0);
+			//vcap.set(CV_CAP_PROP_SATURATION, 4/100.0);
+			//vcap.set(CV_CAP_PROP_HUE, 5/100.0);
+			//vcap.set(CV_CAP_PROP_GAIN, 1/100.0);
 
 			cout<<vcap.get(CV_CAP_PROP_FRAME_WIDTH)<<endl;
 			cout<<vcap.get(CV_CAP_PROP_FRAME_HEIGHT)<<endl;
@@ -1733,23 +1770,23 @@ void *VideoCap(void *args)
 				//Initialize Zed Camera
 
 				cam.ZED_init_VGA();
-				cam.setZEDBrightness(zedBrightness);
-				cam.setZEDContrast(zedContrast);
-				cam.setZEDExposure(zedExposure);
-				cam.setZEDHue(zedHue);
-				cam.setZEDSaturation(zedSat);
-				cam.setZEDGain(zedGain);
+				//cam.ZED_init_HD720();
+
 
 
 				count++;
 				usleep(1000000);
 			}
 
-
+			cam.setZEDBrightness(1);
+			cam.setZEDContrast(4);
+			cam.setZEDExposure(5);
+			cam.setZEDHue(5);
+			cam.setZEDSaturation(4);
+			cam.setZEDGain(9);
 			cout << "It took " << diffClock(start,end) << " seconds to set up stream " << endl;
 
-			FOV_WIDTH_PIX = cam.getCameraWidth();
-			FOV_HEIGHT_PIX = cam.getCameraHeight();
+
 			clock_gettime(CLOCK_REALTIME, &bufferStart);
 
 			//First iteration of Loop will clear stream buffer for preset amount
@@ -1766,8 +1803,24 @@ void *VideoCap(void *args)
 					//read frame and store it in global variable
 					pthread_mutex_lock(&frameMutex);
 					isFrameCopyComplete=false;
+
 					cam.getCurrentImage(frame);
-					resize(frame,frame,Size(320,240));	// Resize the frame of the zed camera to 320, 240
+
+
+					double zoom;
+					if (scale == 0)
+						zoom = 1;
+					else
+						zoom = 1+scale/10.0;
+
+					int height = cam.getCameraHeight()/zoom;
+					int width = cam.getCameraWidth()/zoom;
+
+					//resize(frame,frame,Size(frame.cols,frame.rows));
+					Rect myROI(frame.cols/2 - width/2, frame.rows/2  - height/2, width, height);
+					frame = frame(myROI);
+					resize(frame,frame,Size(320,240));
+
 					isFrameCopyComplete=true;
 					pthread_mutex_unlock(&frameMutex);
 					pthread_cond_signal(&FrameCopyCompleteSignal);
@@ -1858,7 +1911,23 @@ void *VideoCap(void *args)
 			pthread_mutex_lock(&frameMutex);
 			isFrameCopyComplete=false;
 			vcap.read(frame);
-			resize(frame,frame,Size(320,240));
+
+			double zoom;
+			if (scale == 0)
+				zoom = 1;
+			else
+				zoom = 1+scale/10.0;
+			int height = vcap.get(CV_CAP_PROP_FRAME_HEIGHT)/zoom;
+			int width = vcap.get(CV_CAP_PROP_FRAME_WIDTH)/zoom;
+
+			//resize(frame,frame,Size(frame.cols,frame.rows));
+			Rect myROI(frame.cols/2 - width/2, frame.rows/2  - height/2, width, height);
+			frame = frame(myROI);
+			if(struct_ptr->ROTATE == 1 || struct_ptr->ROTATE == 2)
+				resize(frame,frame,Size(240,320));
+			else
+				resize(frame,frame,Size(320,240));
+
 			isFrameCopyComplete=true;
 			pthread_mutex_unlock(&frameMutex);
 			pthread_cond_signal(&FrameCopyCompleteSignal);
